@@ -20,3 +20,24 @@ A library that does a similar thing is [rdiff](https://linux.die.net/man/1/rdiff
 2. detects chunk changes and/or additions
 3. detects chunk removals
 4. detects additions between chunks with shifted original chunks
+## Technical details
+
+This package implements a rolling hash algorithm to compute the delta (differences) between two files. The algorithm works by reading both the original and updated versions of the file in chunks, computing the hash of each chunk using the SHA1 hash function, and then comparing the hashes of the chunks from the original and updated files.
+
+The package includes the following main components:
+
+* A `chunk` struct that contains the hash of a chunk of bytes, and the bytes themselves.
+* A `RollingHash` struct that contains a hash.Hash interface and the size of the chunks to be read from the file.
+* The `NewRollingHash` function that returns a new `RollingHash` struct.
+* The `ComputeHashes` method that reads a file in chunks and computes the hash of each chunk using the SHA1 hash function.
+* The `ComputeDelta` method that generates a description of the differences between the original and updated versions of a file, by comparing the hashes of the chunks from the original and updated files.
+
+To use the package, you can create a new `RollingHash` struct and call the `ComputeDelta` method to get the delta between two files. You can also call the `ComputeHashes` method to get the list of chunks and their corresponding hashes for a file.
+
+## Food for thought for future version
+* For now, it uses the SHA1 hash function, which is considered insecure. It could be improved by using a more secure hash function, such as SHA256 or SHA3.
+* As of now it reads the original and updated files in their entirety before computing the delta. It could be improved by reading and processing the files in smaller chunks to allow for more efficient memory usage and faster processing times.
+* Also for now, current implementation only compares the hashes of the chunks to determine if they are the same. After further reading something like Rabin Fingerprint algorithm along the same lines could be implemented.
+* Currently, it only generates the delta for added or modified chunks. It could be improved by also including information about deleted chunks in the delta.
+* Test cases and error handling needs to be improved, providing more detailed error messages.
+* Eventually a mechanism for verifying the integrity of the original file after applying the delta should be added.

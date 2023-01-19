@@ -2,7 +2,7 @@ package rollinghash
 
 import (
 	"crypto/sha1"
-	"fmt"
+	"hash"
 	"io"
 	"os"
 )
@@ -11,17 +11,30 @@ import (
 // in chunks,computing the hash of each chunk using the SHA1 hash function.
 // It then compares the hashes of the chunks from the originalFilename and updatedFilename files
 
-const chunkSize = 1024 // chunk size in bytes
-
 type chunk struct {
 	hash  [sha1.Size]byte
 	bytes []byte
 }
 
-// computeChunkHashes computes the hash of each chunk in the given file
-func computeChunkHashes(file *os.File) ([]chunk, error) {
+type RollingHash struct {
+	hasher    hash.Hash
+	chunkSize int
+}
+
+// NewRollingHash returns a new RollingHash struct
+func NewRollingHash(chunkSize int) *RollingHash {
+	return &RollingHash{hasher: sha1.New(), chunkSize: chunkSize}
+}
+
+type RDiff interface {
+	ComputeHashes(file *os.File) ([]chunk, error)
+	ComputeDelta(original, updated *os.File) ([]byte, error)
+}
+
+// ComputeHashes reads a file in chunks and computes the hash of each chunk using the SHA1 hash function
+func (r *RollingHash) ComputeHashes(file *os.File) ([]chunk, error) {
 	chunks := make([]chunk, 0)
-	buf := make([]byte, chunkSize)
+	buf := make([]byte, r.chunkSize)
 
 	for {
 		n, err := file.Read(buf)
@@ -31,33 +44,20 @@ func computeChunkHashes(file *os.File) ([]chunk, error) {
 		if err != nil {
 			return nil, err
 		}
-		hash := sha1.Sum(buf[:n])
-		chunks = append(chunks, chunk{hash: hash, bytes: buf[:n]})
-		fmt.Println("number of chunks", len(chunks))
+		sum := sha1.Sum(buf[:n])
+		chunks = append(chunks, chunk{hash: sum, bytes: buf[:n]})
 	}
 
 	return chunks, nil
 }
 
-// ComputeDelta generates a description of the differences between the originalFilename and updatedFilename versions of the file
-func ComputeDelta(original, updated *os.File) ([]byte, error) {
-	buf := make([]byte, chunkSize)
-
-	for {
-		n, err := original.Read(buf)
-		if n == 0 || err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	originalChunks, err := computeChunkHashes(original)
+// ComputeDelta generates a description of the differences between the original and updated versions of a file
+func (r *RollingHash) ComputeDelta(original, updated *os.File) ([]byte, error) {
+	originalChunks, err := r.ComputeHashes(original)
 	if err != nil {
 		return nil, err
 	}
-	updatedChunks, err := computeChunkHashes(updated)
+	updatedChunks, err := r.ComputeHashes(updated)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func ComputeDelta(original, updated *os.File) ([]byte, error) {
 	var delta []byte
 
 	for updatedPos < len(updatedChunks) {
-		// if the hashes of the current chunk from the originalFilename and updatedFilename files match,
+		// if the hashes of the current chunk from the original and updated files match,
 		// it means the chunk can be reused and we can move to the next chunk in both lists
 		if originalPos < len(originalChunks) && originalChunks[originalPos].hash == updatedChunks[updatedPos].hash {
 			originalPos++

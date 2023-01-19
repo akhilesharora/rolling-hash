@@ -2,28 +2,31 @@ package main
 
 import (
 	"fmt"
-	"github.com/akhilesharora/rolling-hash/pkg/rollinghash"
 	"log"
 	"os"
+
+	"github.com/akhilesharora/rolling-hash/pkg/rollinghash"
 )
 
 func main() {
-	original, err := os.Open("tmp/original.txt")
+	original, err := os.Open("testData/original.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer original.Close()
 
-	updated, err := os.Open("tmp/updated.txt")
+	updated, err := os.Open("testData/updated.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer updated.Close()
 
-	delta, err := rollinghash.ComputeDelta(original, updated)
+	r := rollinghash.NewRollingHash(1024)
+
+	delta, err := r.ComputeDelta(original, updated)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(delta)
+	fmt.Println(string(delta))
 }
